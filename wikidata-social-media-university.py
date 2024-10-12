@@ -1,18 +1,47 @@
-# pip install sparqlwrapper
-# https://rdflib.github.io/sparqlwrapper/
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
 
-import sys
-import json
-from SPARQLWrapper import SPARQLWrapper, JSON
+# Pywikibot will automatically set the user-agent to include your username.
+# To customise the user-agent see
+# https://www.mediawiki.org/wiki/Manual:Pywikibot/User-agent
 
-endpoint_url = "https://query.wikidata.org/sparql"
+import pywikibot
+from pywikibot.pagegenerators import WikidataSPARQLPageGenerator
+from pywikibot.bot import SingleSiteBot
 
-query = """#Social Media-Auftritte von deutschen Universitäten
-SELECT DISTINCT ?uni ?uniLabel ?mastodonUrl ?xUri ?facebookUrl ?linkedInUrl ?instagramUrl ?blueskyUrl ?tiktokUrl ?YouTubeUrl
+
+class WikidataQueryBot(SingleSiteBot):
+    """
+    Basic bot to show wikidata queries.
+
+    See https://www.mediawiki.org/wiki/Special:MyLanguage/Manual:Pywikibot
+    for more information.
+    """
+
+    def __init__(self, generator, **kwargs):
+        """
+        Initializer.
+
+        @param generator: the page generator that determines on which pages
+            to print
+        @type generator: generator
+        """
+        super(WikidataQueryBot, self).__init__(**kwargs)
+        self.generator = generator
+
+    def treat(self, page):
+        print(page)
+
+
+if __name__ == '__main__':
+    query = """SELECT DISTINCT ?uni ?uniLabel ?website ?mastodonUrl ?xUri ?facebookUrl ?linkedInUrl ?instagramUrl ?blueskyUrl ?tiktokUrl ?YouTubeUrl
 WHERE
 {
   ?uni wdt:P31/wdt:P279* wd:Q875538;
-       wdt:P17 wd:Q183.
+       wdt:P17 wd:Q183;
+       wdt:P856 ?website.
+  
+   MINUS { ?uni wdt:P361 ?some. }
   
   # mastodon
   OPTIONAL { ?uni wdt:P4033 ?mastodon. }
@@ -51,16 +80,8 @@ WHERE
   SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],mul,en". }
 }
 """
-
-
-def get_results(endpoint_url, query):
-    user_agent = "WDQS-example Python/%s.%s" % (sys.version_info[0], sys.version_info[1])
-    # TODO adjust user agent; see https://w.wiki/CX6
-    sparql = SPARQLWrapper(endpoint_url, agent=user_agent)
-    sparql.setQuery(query)
-    sparql.setReturnFormat(JSON)
-    return sparql.query().convert()
-
-results = get_results(endpoint_url, query)
-
-print(json.dumps(results))
+    site = pywikibot.Site()
+    gen = WikidataSPARQLPageGenerator(query, site=site.data_repository(),
+                                      endpoint='https://query.wikidata.org/sparql')
+    bot = WikidataQueryBot(gen, site=site)
+    bot.run()
