@@ -1,45 +1,27 @@
-#!/usr/bin/python
-# -*- coding: utf-8 -*-
+# pip install sparqlwrapper
+# https://rdflib.github.io/sparqlwrapper/
 
-# Pywikibot will automatically set the user-agent to include your username.
-# To customise the user-agent see
-# https://www.mediawiki.org/wiki/Manual:Pywikibot/User-agent
+import sys
+from SPARQLWrapper import SPARQLWrapper, JSON
 
-import pywikibot
-from pywikibot.pagegenerators import WikidataSPARQLPageGenerator
-from pywikibot.bot import SingleSiteBot
+endpoint_url = "https://query.wikidata.org/sparql"
 
+query = """SELECT ?uni 
+      (IRI(MIN(STR(?websites))) as ?website) # only one result per university is needed
+      (IRI(MIN(STR(?mastodonUrls))) as ?mastodonUrl)
+      (IRI(MIN(STR(?xUris))) as ?xUri)
+      (IRI(MIN(STR(?facebookUrls))) as ?facebookUrl)
+      (IRI(MIN(STR(?linkedInUrls))) as ?linkedInUrl)
+      (IRI(MIN(STR(?instagramUrls))) as ?instagramUrl)
+      (IRI(MIN(STR(?blueskyUrls))) as ?blueskyUrl)
+      (IRI(MIN(STR(?tiktokUrls))) as ?tiktokUrl)
+      (IRI(MIN(STR(?YouTubeUrls))) as ?YouTubeUrl)
 
-class WikidataQueryBot(SingleSiteBot):
-    """
-    Basic bot to show wikidata queries.
-
-    See https://www.mediawiki.org/wiki/Special:MyLanguage/Manual:Pywikibot
-    for more information.
-    """
-
-    def __init__(self, generator, **kwargs):
-        """
-        Initializer.
-
-        @param generator: the page generator that determines on which pages
-            to print
-        @type generator: generator
-        """
-        super(WikidataQueryBot, self).__init__(**kwargs)
-        self.generator = generator
-
-    def treat(self, page):
-        print(page)
-
-
-if __name__ == '__main__':
-    query = """SELECT DISTINCT ?uni ?uniLabel ?website ?mastodonUrl ?xUri ?facebookUrl ?linkedInUrl ?instagramUrl ?blueskyUrl ?tiktokUrl ?YouTubeUrl
 WHERE
 {
   ?uni wdt:P31/wdt:P279* wd:Q875538;
        wdt:P17 wd:Q183;
-       wdt:P856 ?website.
+       wdt:P856 ?websites.
   
    MINUS { ?uni wdt:P361 ?some. }
   
@@ -47,41 +29,52 @@ WHERE
   OPTIONAL { ?uni wdt:P4033 ?mastodon. }
     BIND(REPLACE(STR(?mastodon), '.*@','') as ?mastodonDomain)
     BIND(REPLACE(STR(?mastodon), '@.*','') as ?mastodonName)
-    BIND(IRI(CONCAT('https://', ?mastodonDomain, '/@', ?mastodonName)) as ?mastodonUrl)
+    BIND(IRI(CONCAT('https://', ?mastodonDomain, '/@', ?mastodonName)) as ?mastodonUrls )
   
   # X / twitter
   OPTIONAL { ?uni wdt:P2002 ?x. }
-    BIND(IRI(CONCAT('https://x.com/',?x)) as ?xUri)
+    BIND(IRI(CONCAT('https://x.com/',?x)) as ?xUris )
   
-  # facebook https://www.facebook.com/universitaetbremen
+  # facebook
   OPTIONAL { ?uni wdt:P2013 ?facebook. }
-    BIND(IRI(CONCAT('https://www.facebook.com/', ?facebook)) as ?facebookUrl)
+    BIND(IRI(CONCAT('https://www.facebook.com/', ?facebook)) as ?facebookUrls )
   
   # LinkedIn
   OPTIONAL { ?uni wdt:P4264 ?linkedIn. }
-    BIND(IRI(CONCAT('https://www.linkedin.com/company/', ?linkedIn)) as ?linkedInUrl)
+    BIND(IRI(CONCAT('https://www.linkedin.com/company/', ?linkedIn)) as ?linkedInUrls )
   
   # Instagram
   OPTIONAL { ?uni wdt:P2003 ?instagram.}
-    BIND(IRI(CONCAT('https://www.instagram.com/', ?instagram)) as ?instagramUrl)
+    BIND(IRI(CONCAT('https://www.instagram.com/', ?instagram)) as ?instagramUrls )
   
   # BlueSky
   OPTIONAL { ?uni wdt:P12361 ?bluesky. }
-    BIND(IRI(CONCAT('https://bsky.app/profile/', ?bluesky)) as ?blueskyUrl)
+    BIND(IRI(CONCAT('https://bsky.app/profile/', ?bluesky)) as ?blueskyUrls )
   
   # TikTok
   OPTIONAL { ?uni wdt:P7085 ?tiktok. }
-    BIND(IRI(CONCAT('https://www.tiktok.com/@', ?tiktok)) as ?tiktokUrl)
+    BIND(IRI(CONCAT('https://www.tiktok.com/@', ?tiktok)) as ?tiktokUrls )
   
   # YouTube
   OPTIONAL { ?uni wdt:P2397 ?YouTube.}
-   BIND(IRI(CONCAT("https://www.youtube.com/channel/", STR( ?YouTube ))) AS ?YouTubeUrl ) .
+   BIND(IRI(CONCAT("https://www.youtube.com/channel/", STR( ?YouTube ))) AS ?YouTubeUrls ) .
   
   SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],mul,en". }
 }
-"""
-    site = pywikibot.Site()
-    gen = WikidataSPARQLPageGenerator(query, site=site.data_repository(),
-                                      endpoint='https://query.wikidata.org/sparql')
-    bot = WikidataQueryBot(gen, site=site)
-    bot.run()
+
+GROUP BY ?uni"""
+
+
+def get_results(endpoint_url, query):
+    user_agent = "WDQS-example Python/%s.%s" % (sys.version_info[0], sys.version_info[1])
+    # TODO adjust user agent; see https://w.wiki/CX6
+    sparql = SPARQLWrapper(endpoint_url, agent=user_agent)
+    sparql.setQuery(query)
+    sparql.setReturnFormat(JSON)
+    return sparql.query().convert()
+
+
+results = get_results(endpoint_url, query)
+
+for result in results["results"]["bindings"]:
+    print(result)
