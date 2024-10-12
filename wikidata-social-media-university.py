@@ -6,7 +6,7 @@ from SPARQLWrapper import SPARQLWrapper, JSON
 
 endpoint_url = "https://query.wikidata.org/sparql"
 
-query = """SELECT ?uni 
+query = """SELECT ?uni ?uniLabel
       (IRI(MIN(STR(?websites))) as ?website) # only one result per university is needed
       (IRI(MIN(STR(?mastodonUrls))) as ?mastodonUrl)
       (IRI(MIN(STR(?xUris))) as ?xUri)
@@ -62,7 +62,7 @@ WHERE
   SERVICE wikibase:label { bd:serviceParam wikibase:language "[AUTO_LANGUAGE],mul,en". }
 }
 
-GROUP BY ?uni"""
+GROUP BY ?uni ?uniLabel"""
 
 
 def get_results(endpoint_url, query):
